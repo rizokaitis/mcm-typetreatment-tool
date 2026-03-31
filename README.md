@@ -4,7 +4,7 @@ A web-based tool that automates McMaster University's headline highlight type tr
 
 ## 🔗 Live Tool
 
-**Use the tool online:** [https://rizokaitis.github.io/mcm-typetreatment-tool/](https://rizokaitis.github.io/mcm-typetreatment-tool/)
+**Use the tool online:** https://rizokaitis.github.io/mcm-typetreatment-tool/ 
 
 No installation required — works directly in your browser.
 
