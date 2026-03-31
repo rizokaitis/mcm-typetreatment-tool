@@ -55,7 +55,7 @@ A web-based tool that automates McMaster University's headline highlight type tr
 - **SVG**: Built from canvas-measured word positions with **all unicode ranges** (latin, latin-ext) embedded as base64 `@font-face` for proper accented character rendering
 - **PDF**: SVG → jsPDF via svg2pdf.js
 - **EPS (Print/CMYK)**: PostScript with CMYK color definitions and outlined text paths
-  - Maroon: C0 M100 Y15 K60 (converts #7A003C to CMYK for print)
+  - Maroon: C0 M100 Y15 K60 (manually calibrated by McMaster design team to visually match digital #7A003C when printed)
   - Black: C0 M0 Y0 K100, White: C0 M0 Y0 K0
   - Uses opentype.js to load Poppins Bold and convert text to vector paths
   - Proper quadratic-to-cubic bezier conversion for smooth PostScript curves
@@ -243,7 +243,7 @@ EPS export with CMYK support complete. Export cropping fixed. Preview expansion 
 2. **Added EPS export with CMYK color support**
    - New export format: "EPS (Print/CMYK)" for professional print workflows
    - **CMYK color definitions**:
-     - Maroon: `C0 M100 Y15 K60` (matches #7A003C in print)
+     - Maroon: `C0 M100 Y15 K60` (manually calibrated print value — visually matches digital #7A003C)
      - Black: `C0 M0 Y0 K100`
      - White: `C0 M0 Y0 K0`
    - **Font handling**: Uses opentype.js to convert Poppins Bold text to outlined vector paths

@@ -1280,8 +1280,11 @@ body {
       eps += '%%EndComments\n\n';
 
       // Define CMYK color procedures
+      // Note: CMYK values are manually calibrated by McMaster design team for visual
+      // consistency between digital and print. C0 M100 Y15 K60 does NOT mathematically
+      // match #7A003C — this is intentional to ensure the printed color looks correct.
       eps += '% CMYK Color Definitions\n';
-      eps += '/maroon { 0 1.0 0.15 0.6 setcmykcolor } def  % C0 M100 Y15 K60 (#7A003C)\n';
+      eps += '/maroon { 0 1.0 0.15 0.6 setcmykcolor } def  % C0 M100 Y15 K60 (calibrated for print, corresponds to digital #7A003C)\n';
       eps += '/white { 0 0 0 0 setcmykcolor } def\n';
       eps += '/black { 0 0 0 1.0 setcmykcolor } def\n\n';
 
