@@ -1191,7 +1191,8 @@ body {
           x: boxLeft,
           y: boxTop,
           width: boxRight - boxLeft,
-          height: boxBottom - boxTop
+          height: boxBottom - boxTop,
+          lineIdx: lineIdx
         });
       });
     }
@@ -1223,24 +1224,37 @@ body {
       alert('Export library failed to load. Check your internet connection.');
       return;
     }
-    if (typeof opentype === 'undefined') {
-      alert('Font library failed to load. Check your internet connection.');
+    if (typeof htmlToImage === 'undefined') {
+      alert('Export library failed to load. Check your internet connection.');
       return;
     }
 
+    // Temporarily remove animation classes for clean capture
+    previewContainer.classList.remove('animate');
+    const lines = previewContainer.querySelectorAll('.preview-line');
+    const boxes = previewContainer.querySelectorAll('.highlight-box');
+    lines.forEach(function(l) { l.style.animation = ''; l.style.opacity = '1'; l.style.transform = ''; });
+    boxes.forEach(function(b) { b.style.animation = ''; b.style.transform = ''; });
+
     try {
-      // Use SVG with outlined paths to ensure Poppins Bold renders correctly
-      const svgString = await buildSVGStringWithPaths();
-      const parser = new DOMParser();
-      const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
-      const svgElement = svgDoc.documentElement;
+      // Capture preview at 4× resolution for high-quality PDF
+      const dataUrl = await htmlToImage.toPng(previewContainer, {
+        backgroundColor: currentBg === 'white' ? '#FFFFFF' : '#000000',
+        pixelRatio: 4
+      });
 
-      const vb = svgElement.getAttribute('viewBox').split(' ').map(Number);
-      const svgWidth = vb[2];
-      const svgHeight = vb[3];
+      // Load image to get dimensions
+      const img = new Image();
+      await new Promise(function(resolve, reject) {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = dataUrl;
+      });
 
-      const widthMm = svgWidth * 0.2645833;
-      const heightMm = svgHeight * 0.2645833;
+      // Convert rendered pixel size to mm (divide by pixelRatio to get CSS px, then to mm)
+      const pxToMm = 0.2645833;
+      const widthMm = (img.width / 4) * pxToMm;
+      const heightMm = (img.height / 4) * pxToMm;
 
       const { jsPDF } = window.jspdf;
       const pdf = new jsPDF({
@@ -1249,17 +1263,15 @@ body {
         format: [widthMm, heightMm]
       });
 
-      await pdf.svg(svgElement, {
-        x: 0, y: 0,
-        width: widthMm,
-        height: heightMm
-      });
-
+      pdf.addImage(dataUrl, 'PNG', 0, 0, widthMm, heightMm);
       pdf.save('mcmaster-type-treatment.pdf');
     } catch (err) {
       console.error('PDF export failed:', err);
       alert('PDF export failed: ' + err.message);
     }
+
+    // Restore preview state
+    render(false);
   }
 
   // EPS Export (Print/CMYK) — with Poppins Bold outlined as paths
@@ -1435,59 +1447,47 @@ body {
     return svg;
   }
 
-  // Code Export
-  function exportCode() {
+  // Code Export — captures the actual preview DOM and replays its animation
+  async function exportCode() {
     if (!isGenerated) return;
 
-    const layout = computeExportLayout();
-    const bgColor = currentBg === 'white' ? '#FFFFFF' : '#000000';
+    // Strip animation artifacts so we capture clean DOM state
+    previewContainer.classList.remove('animate');
+    const pLines = previewContainer.querySelectorAll('.preview-line');
+    const pBoxes = previewContainer.querySelectorAll('.highlight-box');
+    const pOverlays = previewContainer.querySelectorAll('.text-reveal-overlay');
+    // Remove inline styles (not set them) so they don't pollute captured HTML
+    pLines.forEach(function(l) { l.style.removeProperty('animation'); l.style.removeProperty('opacity'); l.style.removeProperty('transform'); });
+    pBoxes.forEach(function(b) { b.style.removeProperty('animation'); b.style.removeProperty('transform'); });
+    pOverlays.forEach(function(o) { o.remove(); });
 
-    // Build the HTML lines
-    let textHTML = '';
-    let wordIdx = 0;
-    layout.lineData.forEach(function(words, lineIdx) {
-      textHTML += '    <div class="line line-' + lineIdx + '">';
-      words.forEach(function(word, wIdx) {
-        const isHl = layout.highlightedIndices.has(wordIdx);
-        const cls = isHl ? 'word highlighted' : 'word normal';
-        textHTML += '<span class="' + cls + '">' + escapeHTML(word) + '</span>';
-        if (wIdx < words.length - 1) textHTML += '<span class="word normal"> </span>';
-        wordIdx++;
-      });
-      textHTML += '</div>\n';
-    });
+    const isWhiteBg = currentBg === 'white';
+    const textColor = isWhiteBg ? '#000000' : '#FFFFFF';
 
-    // Line animation delays
-    let lineCSS = '';
-    layout.lineData.forEach(function(_, i) {
-      lineCSS += '    .line-' + i + ' { animation-delay: ' + (i * 0.15) + 's; }\n';
-    });
-    const boxDelay = (layout.lineData.length * 0.15) + 0.3;
-
-    // Get highlight box geometry from the layout engine (not DOM)
-    let boxCSS = '';
-    let boxHTML = '';
-    if (layout.highlightBoxes.length > 0) {
-      boxCSS += '    .highlight-box {\n';
-      boxCSS += '      position: absolute;\n';
-      boxCSS += '      background: #7A003C;\n';
-      boxCSS += '      z-index: 1;\n';
-      boxCSS += '      transform-origin: left center;\n';
-      boxCSS += '      transform: scaleX(0);\n';
-      boxCSS += '      animation: revealBox 0.5s ease-out forwards;\n';
-      boxCSS += '    }\n';
-      layout.highlightBoxes.forEach(function(box, i) {
-        const delay = boxDelay + (i * 0.08);
-        boxCSS += '    .highlight-box-' + i + ' {\n';
-        boxCSS += '      left: ' + box.x + 'px;\n';
-        boxCSS += '      top: ' + box.y + 'px;\n';
-        boxCSS += '      width: ' + box.width + 'px;\n';
-        boxCSS += '      height: ' + box.height + 'px;\n';
-        boxCSS += '      animation-delay: ' + delay + 's;\n';
-        boxCSS += '    }\n';
-        boxHTML += '  <div class="highlight-box highlight-box-' + i + '"></div>\n';
+    // On white bg, highlighted words are already white (post-animation).
+    // Reset them to black so they're visible during the fade-up in the export.
+    if (isWhiteBg) {
+      previewContainer.querySelectorAll('.preview-word[data-highlighted="true"]').forEach(function(w) {
+        w.style.color = textColor;
       });
     }
+
+    // Force layout so measurements are stable
+    void previewContainer.offsetHeight;
+
+    // Capture the EXACT preview HTML (boxes positioned, text in pre-animation colors)
+    const previewHTML = previewContainer.innerHTML;
+
+    // Current settings
+    const fontSize = parseInt(sizeNumber.value) || 72;
+    const lineHeight = computeLineHeight(fontSize);
+    const bgColor = currentBg === 'white' ? '#FFFFFF' : '#000000';
+
+    // Embed fonts
+    const fontCSS = await getEmbeddedFontCSS();
+    const fontBlock = fontCSS
+      ? '<style>\n' + fontCSS + '\n</style>'
+      : '<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap" rel="stylesheet">';
 
     const code = '<!DOCTYPE html>\n' +
 '<html lang="en">\n' +
@@ -1495,58 +1495,118 @@ body {
 '<meta charset="UTF-8">\n' +
 '<meta name="viewport" content="width=device-width, initial-scale=1.0">\n' +
 '<title>McMaster Type Treatment</title>\n' +
-'<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@700&display=swap" rel="stylesheet">\n' +
+fontBlock + '\n' +
 '<style>\n' +
-'  * { margin: 0; padding: 0; box-sizing: border-box; }\n' +
-'  body {\n' +
-'    display: flex;\n' +
-'    align-items: center;\n' +
-'    justify-content: center;\n' +
-'    min-height: 100vh;\n' +
-'    background: ' + bgColor + ';\n' +
-'    font-family: "Poppins", sans-serif;\n' +
-'    font-weight: 700;\n' +
-'  }\n' +
-'  .container {\n' +
-'    position: relative;\n' +
-'    padding: 40px;\n' +
-'    font-size: ' + layout.fontSize + 'px;\n' +
-'    line-height: ' + layout.lineHeight + 'px;\n' +
-'  }\n' +
-boxCSS +
-'  .line {\n' +
-'    display: block;\n' +
-'    white-space: nowrap;\n' +
-'    position: relative;\n' +
-'    z-index: 2;\n' +
-'    opacity: 0;\n' +
-'    transform: translateY(15px);\n' +
-'    animation: fadeUp 0.4s ease-out forwards;\n' +
-'  }\n' +
-lineCSS +
-'  .word { position: relative; z-index: 2; }\n' +
-(currentBg === 'white' && layout.highlightBoxes.length > 0
-  ? '  .word.highlighted { color: ' + layout.textColor + '; animation: textToWhite 0.15s ease-out ' + boxDelay + 's forwards; }\n'
-  : '  .word.highlighted { color: #FFFFFF; }\n') +
-'  .word.normal { color: ' + layout.textColor + '; }\n' +
-'  @keyframes fadeUp {\n' +
-'    to { opacity: 1; transform: translateY(0); }\n' +
-'  }\n' +
-'  @keyframes revealBox {\n' +
-'    to { transform: scaleX(1); }\n' +
-'  }\n' +
-(currentBg === 'white' && layout.highlightBoxes.length > 0
-  ? '  @keyframes textToWhite {\n    to { color: #FFFFFF; }\n  }\n'
-  : '') +
+'*{margin:0;padding:0;box-sizing:border-box}\n' +
+'body{display:flex;align-items:center;justify-content:center;min-height:100vh;background:' + bgColor + ';font-family:"Poppins",sans-serif;font-weight:700}\n' +
+'#ct{position:relative;padding:40px;font-size:' + fontSize + 'px;line-height:' + lineHeight + 'px}\n' +
+'#ct.loading *{opacity:0!important}\n' +
+'.preview-line{display:block;white-space:nowrap;position:relative;z-index:2;overflow:visible}\n' +
+'.preview-word{display:inline;position:relative;z-index:2}\n' +
+'.highlight-box{position:absolute;background:#7A003C;z-index:1;pointer-events:none}\n' +
+'@keyframes fadeUp{to{opacity:1;transform:translateY(0)}}\n' +
+'@keyframes revealBox{to{transform:scaleX(1)}}\n' +
 '</style>\n' +
 '</head>\n' +
 '<body>\n' +
-'<div class="container">\n' +
-boxHTML +
-textHTML +
+'<div id="ct" class="loading">\n' +
+previewHTML + '\n' +
 '</div>\n' +
+'<scr' + 'ipt>\n' +
+'(function(){\n' +
+'var ct=document.getElementById("ct");\n' +
+'var fs=' + fontSize + ';\n' +
+'var isW=' + isWhiteBg + ';\n' +
+'\n' +
+'document.fonts.ready.then(function(){setTimeout(function(){\n' +
+'  var lines=ct.querySelectorAll(".preview-line");\n' +
+'  var boxes=ct.querySelectorAll(".highlight-box");\n' +
+'  var cr=ct.getBoundingClientRect();\n' +
+'\n' +
+'  /* Measure line positions BEFORE setting transforms (opacity:0 doesn\'t affect layout) */\n' +
+'  var lineInfo=[];\n' +
+'  lines.forEach(function(l){\n' +
+'    var r=l.getBoundingClientRect();\n' +
+'    lineInfo.push({el:l,left:r.left-cr.left,top:r.top-cr.top,height:r.height});\n' +
+'  });\n' +
+'\n' +
+'  /* Remove loading mask, set animation initial state */\n' +
+'  ct.classList.remove("loading");\n' +
+'  lines.forEach(function(l){\n' +
+'    l.style.opacity="0";\n' +
+'    l.style.transform="translateY(15px)";\n' +
+'  });\n' +
+'  boxes.forEach(function(b){\n' +
+'    b.style.transform="scaleX(0)";\n' +
+'    b.style.transformOrigin="left center";\n' +
+'  });\n' +
+'  void ct.offsetHeight;\n' +
+'\n' +
+'  /* Fade up lines */\n' +
+'  lines.forEach(function(l,i){\n' +
+'    l.style.animation="fadeUp 0.4s ease-out "+(i*0.15)+"s forwards";\n' +
+'  });\n' +
+'\n' +
+'  /* Reveal boxes + clip-path overlay for white bg */\n' +
+'  var boxBase=(lines.length*0.15)+0.3;\n' +
+'  boxes.forEach(function(box,i){\n' +
+'    var delay=boxBase+i*0.08;\n' +
+'    box.style.animation="revealBox 0.5s ease-out "+delay+"s forwards";\n' +
+'\n' +
+'    if(!isW)return;\n' +
+'    var delayMs=delay*1000;\n' +
+'    var bTop=parseFloat(box.style.top);\n' +
+'    var bLeft=parseFloat(box.style.left);\n' +
+'    var bW=parseFloat(box.style.width);\n' +
+'    var bH=parseFloat(box.style.height);\n' +
+'    var bRight=bLeft+bW;\n' +
+'    var bBottom=bTop+bH;\n' +
+'\n' +
+'    /* Find which line this box overlaps */\n' +
+'    var target=null;\n' +
+'    for(var j=0;j<lineInfo.length;j++){\n' +
+'      var li=lineInfo[j];\n' +
+'      if(li.top<bBottom&&(li.top+li.height)>bTop){target=li;break;}\n' +
+'    }\n' +
+'    if(!target)return;\n' +
+'\n' +
+'    var ov=document.createElement("div");\n' +
+'    ov.style.cssText="position:absolute;left:0;top:0;width:100%;height:100%;z-index:3;pointer-events:none";\n' +
+'\n' +
+'    var clone=target.el.cloneNode(true);\n' +
+'    clone.style.cssText="position:absolute;white-space:nowrap;opacity:1;transform:none;animation:none";\n' +
+'    clone.style.left=target.left+"px";\n' +
+'    clone.style.top=target.top+"px";\n' +
+'    clone.style.fontFamily=\'"Poppins",sans-serif\';\n' +
+'    clone.style.fontWeight="700";\n' +
+'    clone.style.fontSize=fs+"px";\n' +
+'    clone.style.lineHeight=ct.style.lineHeight;\n' +
+'    clone.querySelectorAll(".preview-word").forEach(function(w){\n' +
+'      w.style.color=w.getAttribute("data-highlighted")==="true"?"#FFFFFF":"transparent";\n' +
+'    });\n' +
+'\n' +
+'    ov.appendChild(clone);\n' +
+'    ct.appendChild(ov);\n' +
+'\n' +
+'    var cw=ct.offsetWidth,ch=ct.offsetHeight;\n' +
+'    var extBot=bBottom+5;\n' +
+'    var cf="inset("+bTop+"px "+Math.max(0,cw-bLeft)+"px "+Math.max(0,ch-extBot)+"px "+bLeft+"px)";\n' +
+'    var cto="inset("+bTop+"px "+Math.max(0,cw-bRight)+"px "+Math.max(0,ch-extBot)+"px "+bLeft+"px)";\n' +
+'\n' +
+'    var a=ov.animate([{clipPath:cf},{clipPath:cto}],{duration:500,easing:"ease-out",delay:delayMs,fill:"both"});\n' +
+'    a.finished.then(function(){\n' +
+'      target.el.querySelectorAll(\'.preview-word[data-highlighted="true"]\').forEach(function(w){w.style.color="#FFFFFF"});\n' +
+'      ov.remove();\n' +
+'    });\n' +
+'  });\n' +
+'},50)});\n' +
+'})();\n' +
+'</scr' + 'ipt>\n' +
 '</body>\n' +
 '</html>';
+
+    // Restore preview
+    render(false);
 
     downloadBlob(code, 'mcmaster-type-treatment.html', 'text/html');
   }
