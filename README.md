@@ -57,12 +57,7 @@ Simply bookmark the live tool — no installation needed. All processing happens
 
 ### Option 3: Customize the Code
 
-The entire tool is in one file ([index.html](index.html)) with clear inline comments. You can:
-
-- Modify colors, fonts, or spacing ratios
-- Add custom export formats
-- Integrate with your existing design systems
-- Remove features you don't need
+The entire tool is in one file ([index.html](index.html)) with clear inline comments.
 
 **Documentation:** See [progress.md](progress.md) for implementation details and architecture notes.
 
@@ -85,12 +80,6 @@ Requires modern browser with Canvas API and TextMetrics support.
 - **CDN libraries** — html-to-image, jsPDF, svg2pdf.js, opentype.js (for exports only)
 - **No backend** — All processing happens client-side
 - **File size** — ~60KB HTML + ~140KB fonts
-
----
-
-## License
-
-Contact the repository owner for licensing information.
 
 ---
 
