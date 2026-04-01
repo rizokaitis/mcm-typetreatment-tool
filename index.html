@@ -1216,13 +1216,21 @@ body {
     downloadBlob(svgString, 'mcmaster-type-treatment.svg', 'image/svg+xml');
   }
 
-  // PDF Export
+  // PDF Export — with outlined text paths for accurate font rendering
   async function exportPDF() {
     if (!isGenerated) return;
-    if (typeof window.jspdf === 'undefined') { alert('Export library failed to load. Check your internet connection.'); return; }
+    if (typeof window.jspdf === 'undefined') {
+      alert('Export library failed to load. Check your internet connection.');
+      return;
+    }
+    if (typeof opentype === 'undefined') {
+      alert('Font library failed to load. Check your internet connection.');
+      return;
+    }
 
     try {
-      const svgString = await buildSVGString();
+      // Use SVG with outlined paths to ensure Poppins Bold renders correctly
+      const svgString = await buildSVGStringWithPaths();
       const parser = new DOMParser();
       const svgDoc = parser.parseFromString(svgString, 'image/svg+xml');
       const svgElement = svgDoc.documentElement;
@@ -1250,7 +1258,7 @@ body {
       pdf.save('mcmaster-type-treatment.pdf');
     } catch (err) {
       console.error('PDF export failed:', err);
-      alert('PDF export failed. Please try again.');
+      alert('PDF export failed: ' + err.message);
     }
   }
 
@@ -1370,7 +1378,7 @@ body {
     }
   }
 
-  // Helper to build SVG string (reused by PDF and SVG exports)
+  // Helper to build SVG string with embedded fonts (for SVG export)
   async function buildSVGString() {
     const layout = computeExportLayout();
 
@@ -1389,6 +1397,38 @@ body {
     layout.wordPositions.forEach(function(w) {
       const fill = w.highlighted ? '#FFFFFF' : layout.textColor;
       svg += '<text x="' + w.x + '" y="' + w.baseline + '" font-family="Poppins, sans-serif" font-weight="700" font-size="' + layout.fontSize + '" fill="' + fill + '">' + escapeHTML(w.text) + '</text>\n';
+    });
+
+    svg += '</svg>';
+    return svg;
+  }
+
+  // Helper to build SVG string with outlined text paths (for PDF export)
+  async function buildSVGStringWithPaths() {
+    if (typeof opentype === 'undefined') {
+      throw new Error('Font library not loaded');
+    }
+
+    // Load Poppins Bold font
+    const fontUrl = 'https://cdn.jsdelivr.net/npm/@fontsource/poppins@5.0.8/files/poppins-latin-700-normal.woff';
+    const font = await opentype.load(fontUrl);
+
+    const layout = computeExportLayout();
+
+    let svg = '<?xml version="1.0" encoding="utf-8"?>\n';
+    svg += '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + layout.totalWidth + ' ' + layout.totalHeight + '" width="' + layout.totalWidth + '" height="' + layout.totalHeight + '">\n';
+
+    // Draw highlight boxes
+    layout.highlightBoxes.forEach(function(hb) {
+      svg += '<rect x="' + hb.x + '" y="' + hb.y + '" width="' + hb.width + '" height="' + hb.height + '" fill="#7A003C"/>\n';
+    });
+
+    // Convert text to outlined SVG paths
+    layout.wordPositions.forEach(function(w) {
+      const fill = w.highlighted ? '#FFFFFF' : layout.textColor;
+      const path = font.getPath(w.text, w.x, w.baseline, layout.fontSize);
+      const pathData = path.toPathData(2); // 2 decimal places
+      svg += '<path d="' + pathData + '" fill="' + fill + '"/>\n';
     });
 
     svg += '</svg>';
