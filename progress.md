@@ -412,6 +412,100 @@ None
 
 ---
 
+## Session — 2026-04-01 (Production Deployment)
+
+### Status
+Tool deployed to production at https://rizokaitis.github.io/mcm-typetreatment-tool/. All exports working correctly. Ready for client use.
+
+### Completed This Session
+
+1. **Committed Favicon to Repository**
+   - Committed `Assets/mcm-fav.svg` (McMaster shield) to git
+   - File: 104×104px SVG with maroon (#7A003C) shield design
+   - Git commit: `8adb858` "Add McMaster favicon SVG file"
+   - Favicon now displays correctly in browser tabs
+
+2. **Enabled GitHub Pages Deployment**
+   - Configured GitHub Pages via repository settings
+   - Source: `main` branch, root directory
+   - Live URL: https://rizokaitis.github.io/mcm-typetreatment-tool/
+   - Site responds with HTTP 200 (verified)
+   - User updated README.md with live link
+
+3. **Comprehensive Production Code Review**
+   - Launched `general-purpose` agent for full QA assessment
+   - Review scope: Entire codebase from initial commit to current HEAD
+   - **Overall Assessment**: ✅ **READY TO LAUNCH**
+   - **Critical Issues**: 0
+   - **Important Issues**: 1 (CMYK color specification — resolved as intentional)
+   - **Minor Issues**: 3 (optional polish items)
+   - **Code Quality Rating**: ⭐⭐⭐⭐⭐ (5/5)
+   - Review highlights:
+     - Excellent architecture (single-file, no build process)
+     - Robust error handling (CDN failures, try/catch everywhere)
+     - No security vulnerabilities (proper input escaping, no XSS)
+     - Performance optimized (cached measurements, efficient rendering)
+     - Brand-compliant cap-height precision
+
+4. **Documented CMYK Color Calibration**
+   - **Issue Identified**: Code review flagged CMYK C0 M100 Y15 K60 as not mathematically matching RGB #7A003C
+   - **Resolution**: User confirmed this is **intentional** — values manually calibrated by McMaster design team
+   - RGB and CMYK are different color spaces; direct conversion doesn't produce visually matching colors
+   - McMaster's CMYK value is tweaked to ensure printed color *looks* correct when compared to digital
+   - **Documentation Added**:
+     - `index.html` lines 1283-1285: Added comment explaining calibration is intentional
+     - `index.html` line 1287: Updated inline comment to clarify "calibrated for print"
+     - `progress.md` lines 58, 246: Updated descriptions to note manual calibration
+   - Git commit: `6e3d19c` "Document intentional CMYK calibration for print color"
+
+5. **Fixed PDF Export Font Rendering**
+   - **Issue**: PDF export was not respecting Poppins Bold — defaulting to system font
+   - **Root Cause**: jsPDF's SVG renderer doesn't fully support `@font-face` embedded fonts
+   - **Solution**: Convert text to outlined SVG paths using opentype.js (same approach as EPS export)
+   - **Implementation**:
+     - Added `buildSVGStringWithPaths()` function (lines 1395-1425)
+     - Function loads Poppins Bold via opentype.js
+     - Converts each word to vector path using `font.getPath()` and `toPathData()`
+     - Updated `exportPDF()` to use outlined paths instead of embedded fonts (line 1233)
+     - Added opentype.js availability check (lines 1226-1229)
+   - **Trade-off**: Slightly larger PDF file size, but 100% accurate typography
+   - Git commit: `866ae08` "Fix PDF export font rendering"
+
+### Files Modified
+- `index.html`:
+  - Lines 1219-1255: Updated PDF export to use outlined paths
+  - Lines 1283-1287: Added CMYK calibration documentation
+  - Lines 1370-1425: Split SVG builder into two functions (embedded fonts vs outlined paths)
+- `progress.md`:
+  - Lines 58, 246: Updated CMYK color descriptions to note manual calibration
+- `Assets/mcm-fav.svg`: Committed to repository (previously untracked)
+
+### Production Deployment Verified
+- ✅ Site live at https://rizokaitis.github.io/mcm-typetreatment-tool/
+- ✅ Favicon displays correctly (McMaster shield)
+- ✅ All 5 export formats working:
+  - PNG: Transparent background, 2× resolution ✅
+  - SVG: Embedded fonts, scalable vector ✅
+  - PDF: Outlined paths, accurate typography ✅
+  - EPS: CMYK colors, outlined paths for print ✅
+  - Code: Self-contained HTML with animation ✅
+- ✅ Cross-browser compatible (Chrome, Firefox, Safari 14+)
+- ✅ Responsive design functional
+- ✅ Error handling robust (CDN failures, font loading timeouts)
+
+### Git Commits This Session
+- `8adb858` — Add McMaster favicon SVG file
+- `6e3d19c` — Document intentional CMYK calibration for print color
+- `866ae08` — Fix PDF export font rendering
+
+### Context Notes
+- **Type treatment math 100% preserved** — All changes were documentation and export fixes only
+- **Color specifications confirmed** — RGB #7A003C (digital) and CMYK C0M100Y15K60 (print) are both correct and intentionally different
+- **All exports production-ready** — PNG, SVG, PDF, EPS, and Code all generate correct output with accurate Poppins Bold rendering
+- **Tool ready for client use** — McMaster design team can now use the tool for creating brand-compliant headline treatments
+
+---
+
 ## Important Notes for Future Sessions
 
 **CRITICAL CONSTRAINT**: When making ANY changes to this tool, the type treatment math MUST be preserved:
